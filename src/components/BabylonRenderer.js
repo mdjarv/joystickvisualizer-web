@@ -1,6 +1,8 @@
 import React from "react";
 import * as BABYLON from 'babylonjs';
 
+import InputController from "./InputController";
+
 import quadrant from '../models/quadrant.babylon';
 import logitech from '../models/logitech.babylon';
 
@@ -11,24 +13,21 @@ export default class BabylonRenderer extends React.Component {
             joystick: {
                 x: 0.0,
                 y: 0.0
-            }
+            },
+            inputController: new InputController()
         }
     }
-    
-    componentDidMount() {
 
-        var canvas = this.refs.canvas;
-        var engine = new BABYLON.Engine(canvas, true);
-        var scene = new BABYLON.Scene(engine);
-
+    loadAssets(scene) {
         var assetsManager = new BABYLON.AssetsManager(scene);
 
         var logitechTask = assetsManager.addMeshTask('logitech task', 'Base', '', logitech);
         logitechTask.onSuccess = (task) => {
-//            console.log('----')
-//            console.log('Loaded Logitech')
+            this.setState({
+                meshLogitech3DPro: task.loadedMeshes
+            })
+            
             task.loadedMeshes.forEach((mesh) => {
-//                console.log(' * ' + mesh.name);
                 if (mesh.name === 'Stick') {
                     this.setState({logitechStick: mesh});
                 }
@@ -37,14 +36,21 @@ export default class BabylonRenderer extends React.Component {
 
         var quadrantTask = assetsManager.addMeshTask('quadrant task', 'Base', '', quadrant);
         quadrantTask.onSuccess = (task) => {
-//            console.log('----')
-//            console.log('Loaded quadrant')
-            task.loadedMeshes.forEach((mesh) => {
-//                console.log(' * ' + mesh.name);
+            this.setState({
+                meshSaitekThrottleQuadrant: task.loadedMeshes
             })
         };
 
         assetsManager.load();
+    }
+
+    componentDidMount() {
+
+        var canvas = this.refs.canvas;
+        var engine = new BABYLON.Engine(canvas, true);
+        var scene = new BABYLON.Scene(engine);
+
+        this.loadAssets(scene);
 
         scene.executeWhenReady(() => {
             console.log("scene ready")
@@ -52,21 +58,19 @@ export default class BabylonRenderer extends React.Component {
             scene.activeCamera.setPosition(new BABYLON.Vector3(0, 45, 70));
             scene.clearColor = new BABYLON.Color3(0, 1, 0);
 
-            scene.meshes.forEach((base) => {
-                if (base.name === 'Base') {
-                    base.getChildMeshes(true).forEach((c)=>{
-                        if(c.name === 'Stick') {
-                            //this.setState({gimbal: c})
-                            base.translate(BABYLON.Axis.X, 20, BABYLON.Space.WORLD);
-                            //c.rotate(BABYLON.Axis.X, Math.PI / 4, BABYLON.Space.LOCAL);
-                        }
-                    })
+            var rootIndex = 0;
+
+            scene.meshes.forEach((mesh) => {
+                if (!mesh.parent) {
+                    mesh.translate(BABYLON.Axis.X, 20*rootIndex, BABYLON.Space.WORLD);
+                    rootIndex = rootIndex + 1;
                 }
             });
-           
+  
             engine.runRenderLoop(() => { scene.render(); });
         });
-        scene.afterRender = () => {
+
+        scene.beforeRender = () => {
             var gamepads = navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads : []);
             if (!gamepads) {
               return;
